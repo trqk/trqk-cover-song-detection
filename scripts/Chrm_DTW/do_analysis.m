@@ -27,7 +27,7 @@ if nargin < 9; ctype = 1; end
 if infile(1) != '/'
   ifname = fullfile(srcprepend, [infile, srcext]);
 else
-  ifname = infile
+  ifname = infile;
 end
 
 ofname = fullfile(dstprepend, [srcname, dstext]);

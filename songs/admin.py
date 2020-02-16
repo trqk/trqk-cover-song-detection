@@ -2,7 +2,8 @@
 
 from django.contrib import admin
 
-from .models import SongFile
+from .models import SongFile, SongMatcher
 
 admin.site.register(SongFile)
+admin.site.register(SongMatcher)
 
