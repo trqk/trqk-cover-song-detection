@@ -3,7 +3,7 @@
 #
 
 from django.db import models
-import sys, subprocess
+import sys, subprocess, platform
 
 # Song class has name, title, file...
 
@@ -44,8 +44,12 @@ class SongMatcher(models.Model):
     
     def __init__(self):
 #        print(' -- create the SongMatcher')
-        self.octave = '/opt/local/bin/octave'
-        self.sdir = '/Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/'
+        if platform.system() == 'Linux':
+            self.octave = '/usr/bin/octave'
+            self.sdir = '/home/stp/Code/trqk-cover-song-detection/scripts/Chrm_DTW/'
+        else:
+            self.octave = '/opt/local/bin/octave'
+            self.sdir = '/Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/'
         # shell args: octave script, list file, chgrm folder
 
     def __str__(self):

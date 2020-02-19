@@ -38,3 +38,9 @@ Start django server with
 cd csd_web_app
 ./lrun
 
+
+See readme in separate CSD github repo
+
+
+http://204.236.206.86:8000/songs
+http://ec2-204-236-206-86.compute-1.amazonaws.com:8000/songs
