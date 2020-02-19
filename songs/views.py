@@ -21,8 +21,15 @@ import ast
 
 #----------------
 
-class IndexView(generic.ListView):
+class StartView(generic.View):
     template_name = 'songs/index.html'
+
+    def get(self, request):
+        "Display the file name form"
+        return render(request, 'songs/index.html')
+
+class IndexView(generic.ListView):
+    template_name = 'songs/list.html'
     context_object_name = 'song_list'
 
     def get_queryset(self):
