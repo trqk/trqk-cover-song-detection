@@ -53,7 +53,8 @@ class SongList:
         with open(csv_f, 'w', newline='') as out:
             wrtr = csv.writer(out, delimiter='\t');
             for ix in range(ln - 1):
-                wrtr.writerow(newda[ix]);
+#                wrtr.writerow(newda[ix]);
+                wrtr.writerow(['{:.4}'.format(x) for x in newda[ix]])
             out.close
 
 
