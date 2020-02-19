@@ -1,6 +1,11 @@
 #
 # CSD song DB models
 #
+#     @author: stephenp@trqk.io - 2001
+# 	Copyright (C) 2020 Stephen T. Pope & Trqk, LLC. All rights reserved.
+# 	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE.
+# 	The copyright notice above does not evidence any actual or intended publication
+# 	of such source code.
 
 from django.db import models
 import sys, subprocess, platform
@@ -47,10 +52,9 @@ class SongMatcher(models.Model):
         if platform.system() == 'Linux':
             self.octave = '/usr/bin/octave'
             self.sdir = '/home/stp/Code/trqk-cover-song-detection/scripts/Chrm_DTW/'
-        else:
+        else:     # Darwin
             self.octave = '/opt/local/bin/octave'
             self.sdir = '/Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/'
-        # shell args: octave script, list file, chgrm folder
 
     def __str__(self):
         "Required string name"
@@ -64,6 +68,7 @@ class SongMatcher(models.Model):
         #     /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/list_stp.txt /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/ChrmGrms0/ 
         #     /var/folders/74/xv0vn6s92ml1dt5dnjg8czdw0000gn/T/tmpskhumyk9.upload.mp3
 
+        # shell args: octave script, list file, chgrm folder
         args = ' ' + self.sdir + 'RunOneSong.m ' + self.sdir + 'list_stp.txt ' + self.sdir + 'ChrmGrms0/ '
         cmd = self.octave + ' -p ' + self.sdir + args + son_nam        # create octave command with file name
 #        print(cmd)
@@ -130,5 +135,3 @@ class SongMatcher(models.Model):
             print(str(inst))
             return 0
 
-        
-        

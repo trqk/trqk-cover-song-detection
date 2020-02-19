@@ -1,6 +1,11 @@
 #
-# Create your views here.
+# View classes for the Django front end to the Trqk cover-song detection demo code
 #
+#     @author: stephenp@trqk.io - 2001
+# 	Copyright (C) 2020 Stephen T. Pope & Trqk, LLC. All rights reserved.
+# 	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE.
+# 	The copyright notice above does not evidence any actual or intended publication
+# 	of such source code.
 
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import get_object_or_404, render
