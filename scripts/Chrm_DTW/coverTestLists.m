@@ -69,7 +69,7 @@ for q = 1 : nqlist            ## q list loop (songs to match)
     P = load(tlist{i});
                     %%%%%% Perform the cross-correlation of the two chroma beat ftr matrices %%%%%%%
     if pre_proc
-      r = chromxcorr_opt(Q, P.F, maxlag);
+      r = chromxcorr_opt(Q.F, P.F, maxlag);
     else
       r = chromxcorr(Q.F, P.F, maxlag);
     end    

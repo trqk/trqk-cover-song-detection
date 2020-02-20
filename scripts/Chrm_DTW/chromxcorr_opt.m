@@ -56,7 +56,7 @@ beats = max(length(A), length(F));
 %beats = 2000;
 t = beats + 2 * L + 1;
 
-% disp(['    chromxcorr: ', num2str(length(A)), ' - ', num2str(length(F)), ' - ', num2str(t)]);
+disp(['    chromxcorr_opt: ', num2str(length(A)), ' - ', num2str(length(F)), ' - ', num2str(t)]);
 %    chromxcorr: 852 - 1591 - 3192
 %    chromxcorr: 2708 - 1591 - 4309
 
