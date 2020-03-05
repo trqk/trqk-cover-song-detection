@@ -73,7 +73,7 @@ class SongList:
             lst[ind] = 0
 #            av = mean(lst)
             mx = max(lst)
-            sca = 1.0 # 100.0 / mx        # scale line by 100 / max
+            sca = 100.0 / mx        # scale line by 100 / max
             newli = []
             for i2 in range(len(lst)):
                 newli.append(lst[i2] * sca)

@@ -12,8 +12,10 @@ if strcmp(srcext, '.mp3')
     ds = 1;
   end
   [d, sr] = mp3read(ifname, 0, 1, ds); 
-elseif strcmp(srcext, '.wav')
-  [d,sr] = wavread(ifname);         % wav - use wavread
 else
-  [d, sr] = audioread(ifname);      % aiff - use audioread
+  [d, sr] = audioread(ifname);      % aiff/wav - use audioread
 end
+
+if ndims(d) == 2                    % sum to mono
+  d = sum(d, 2) / size(d, 2);
+endif

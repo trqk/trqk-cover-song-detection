@@ -60,7 +60,7 @@ class SongMatcher(models.Model):
         "Required string name"
         return('SongMatcher')
 
-    def match1(self, son_nam):
+    def match1(self, son_nam, fmt):
         "Given a song file, analyze it and match against the stored DB; return the db index of the new song."
 #        print(' -- running SongMatcher match1')
 
@@ -68,10 +68,14 @@ class SongMatcher(models.Model):
         #     /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/list_stp.txt /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/ChrmGrms0/ 
         #     /var/folders/74/xv0vn6s92ml1dt5dnjg8czdw0000gn/T/tmpskhumyk9.upload.mp3
 
+        # /opt/local/bin/octave -p /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/ /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/RunOneSong.m 
+        # /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/list_stp.txt /Users/stp/Code/CoSoDe/trqk-csd/scripts/Chrm_DTW/ChrmGrms0/ 
+        # /tmp/WaitingInVain.wav
+
         # shell args: octave script, list file, chgrm folder
         args = ' ' + self.sdir + 'RunOneSong.m ' + self.sdir + 'list_stp.txt ' + self.sdir + 'ChrmGrms0/ '
         cmd = self.octave + ' -p ' + self.sdir + args + son_nam        # create octave command with file name
-#        print(cmd)
+        # print(cmd)
         sys.stdout.flush()
         try:
             proc = subprocess.Popen(cmd.split(), stdout = subprocess.PIPE)      # fork octave process and wait
@@ -90,13 +94,18 @@ class SongMatcher(models.Model):
                 if lstr == '--End--':
                     ind1 = cnt
                 cnt = cnt + 1
- #           print('--', ind0, ':', ind1)
+#            print('--', ind0, ':', ind1)
             dct = { }
             for i in range(ind0, ind1 - 1):             # now create a dict of the weights
                 lstr = str(res[i], 'utf-8').rstrip()
                 toks = lstr.split(' | ')                # ['139', '29.394', 'simon_and_garfunkel+Bookends+03-America.aiff']
-                dct[toks[0]] = toks[1]
+                if fmt:
+                    dct[toks[1]] = toks[2]
+                else:
+                    dct[toks[0]] = toks[1]
 #            print(dct)
+            if fmt:
+                return dct
             cnt = len(SongFile.objects.all()) + 1       # now create the SongFile object and save it
             sf = SongFile(fnam = son_nam, art = son_nam, tit = son_nam, alb = son_nam, ind = cnt, mat = dct)
             sf.save()

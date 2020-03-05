@@ -44,7 +44,7 @@ ofdir = fileparts(ofname);
 mymkdir(ofdir)      % Make sure the parent directory exists
 
 [d, sr] = do_sf_read(infile, srcext);    % read sound file
-%disp(['  -- Len: ', num2str(length(d)), ' - SR: ', num2str(sr)]);
+%disp(['  -- Len: ', num2str(length(d)), ' ', num2str(ndims(d)), ' - SR: ', num2str(sr), ' - samp: ', num2str(d(100000))]);
 
 if take1        # take1 = take the middle minute of the song
   samplen = 60;
@@ -55,7 +55,7 @@ if take1        # take1 = take the middle minute of the song
     rng = round(samplen / 2 * sr);
 %        disp(['      -- Subset: ', num2str(dur, "%.1f"), ' : ', num2str(midpt - rng), ' - ', num2str(midpt + rng)]);
     d = d(midpt - rng : midpt + rng);    % subset of samples around mid-point
-%        disp(['Len: ', num2str(length(d))]);
+%    disp(['Len: ', num2str(length(d))]);
   end
 end
             %%%%%%%%%%%%%% do the analysis %%%%%%%%%

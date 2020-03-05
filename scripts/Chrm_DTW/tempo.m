@@ -48,9 +48,9 @@ shop = 32;
 % mel channels
 nmel = 40;
 % sample rate for specgram frames (granularity for rest of processing)
-sgsrate = sro/shop;
+sgsrate = sro / shop;
 % autoco out to 4 s
-acmax = round(4*sgsrate);
+acmax = round(4 * sgsrate);
 
 D = 0;
   
@@ -59,12 +59,17 @@ if length(onsetenv) == 0
 
   % resample to 8 kHz
   if (sr ~= sro)
-    gg = gcd(sro,sr);
-    d = resample(d,sro/gg,sr/gg);
+    gg = gcd(sro, sr);
+    d2 = resample(d, sro/gg, sr/gg);
+##    disp([' -- Resample: ', num2str(sr), ' : ', num2str(sro), ' - ', typeinfo(d), ' - ', typeinfo(d2)]);
+##    disp([num2str(ndims(d)), ' : ', num2str(ndims(d))]);
+##    disp([num2str(length(d)), ' : ', num2str(length(d))]);
+##    disp([num2str(d(44100)), ' : ', num2str(d2(8000))]);
     sr = sro;
+    d = d2;
   end
 
-  D = specgram(d,swin,sr,swin,swin-shop);
+  D = specgram(d, swin, sr, swin, swin - shop);
 
   % Construct db-magnitude-mel-spectrogram
   mlmx = fft2melmx(swin, sr, nmel);

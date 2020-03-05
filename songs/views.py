@@ -14,10 +14,72 @@ from django.views import generic
 from django.shortcuts import render
 from django import forms
 from django.template import loader
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import SongFile, SongMatcher
 from .forms import FileNameForm, FileNameForm2
-import ast
+import ast, json, os
+import urllib.parse
+import requests
+import boto3
+
+# globals
+
+gConfig = 0
+
+#----------------------------------------------------------------------------------------
+#
+# Configuration class - Describes system settings; loaded from JSON at the start
+#
+
+class Configuration(object):
+    "Describes a collection of features and system settings"
+
+    def __init__(self):
+        "Initialize the Configuration object"
+        global gConfig                              # global config object (me)
+        gConfig = self
+        self.log_to_CW = False                       # log to AWS cloudwatch
+        if self.log_to_CW:
+            self.b3Client = boto3.client('logs')
+            respD = self.b3Client.describe_log_streams(logGroupName = 'SndsLikeLogging', 
+                                                logStreamNamePrefix = 'AnalysisLog', limit = 1)
+            try:
+                resCode = respD['ResponseMetadata']['HTTPStatusCode']
+                if resCode == 200:
+                    self.log_seq_tok = respD['logStreams'][0]['uploadSequenceToken']
+            except Exception as inst:
+                print('Error connecting to logging service - exiting')
+                print(inst)
+        try:                                        # Load system settings from JSON file
+            jsNam = 'SL_Settings.json'
+            if not os.path.isfile(jsNam):
+                jsNam = '../SL_Settings.json'
+            setFile = open(jsNam, 'r')
+            stri = setFile.read()
+            settings = json.loads(stri)
+            self.dict = settings
+        except Exception as inst:
+            print('Error reading/parsing settings file \"SL_Settings.json\" - exiting')
+            print(inst)
+
+        self.do_debug = settings['debug_me']         # Debugging flag
+        self.folder = settings['folder']    
+        self.dbName = settings['db_name']            # DB conn parameters and table names
+        self.tableName = settings['db_tableName']
+        self.normName = settings['db_normName']
+        self.host = settings['db_host']
+        self.user = settings['db_user']
+        self.passwd = settings['db_passwd']
+        self.had_error = False                       # whether there were any processing errors
+        self.error_msg = 'No analysis errors'
+        self.kw_args = dict(charset='utf8', use_unicode=True)
+        self.doTiming = settings['do_timing']
+        self.use_s3_store = settings['use_s3_store']
+
+    def get_err(self, key):
+        "Answer an error message from the settings file"
+        return self.dict[key]
 
 #----------------
 
@@ -79,6 +141,7 @@ class MatchesView(generic.ListView):
         song = SongFile.objects.filter(ind = which).first()
         return song
 
+
 class Match1View(generic.View):
     "View for the match-1-song demo"
     form_class = FileNameForm
@@ -95,16 +158,17 @@ class Match1View(generic.View):
     #     form = self.form_class(initial=self.initial)
     #     return render(request, self.template_name, {'form': form})
 
-    def post(self, request, *args, **kwargs):
-        print('---', request.method, '---')
-        form = self.form_class(request.POST)
-        print('---', request.POST, '---')
-        print('---', form.form.cleaned_data, '---')
-        if form.is_valid():
-            # <process form cleaned data>
-            return HttpResponseRedirect('/success/')
+    # def post(self, request, *args, **kwargs):
+    #     print('---', request.method, '---')
+    #     form = self.form_class(request.POST)
+    #     print('---', request.POST, '---')
+    #     print('---', form.form.cleaned_data, '---')
+    #     if form.is_valid():
+    #         # <process form cleaned data>
+    #         return HttpResponseRedirect('/success/')
 
-        return render(request, self.template_name, {'form': form})
+    #     return render(request, self.template_name, {'form': form})
+    
     def post(self, request, *args, **kwargs):
         "Post = run 1-song match and display the results"
         form = FileNameForm(request.POST, request.FILES)
@@ -193,4 +257,181 @@ class Match2View(generic.View):
         sm = SongMatcher()
         rtv = sm.match2(fnam1, fnam2)
         return rtv
+
+# CSD JSON Formats
+#
+#Input:
+# { 
+#   url: valid_url_string_to_S3_or_elsewhere, // if just this, then compare vs reference library
+#   reference: valid_url_string_to_S3_or_elsewhere // optional for comparison of 2 tracks
+# }
+#
+# Output:
+# // if CSD matches to provided reference or reference library (i.e. score > 1), 
+# // then matches contains the individual matches and scores
+# //
+# // if no matches (i.e. CSD scores nothing > 1), the matches array is EMPTY
+# //
+# {
+#   matches: [              // always present, but may be EMPTY if no matches found
+#     {
+#       score: Float,
+#       title: String,
+#       artist: String,
+#       url: valid_url_string_to_S3_or_elsewhere   // could be null or reference url above valid_url_string_to_S3_or_elsewhere
+#     },
+#     { ... }              // may contains one or more matches
+#   ]
+# }
+
+class Match1JSON(generic.View):
+    "View for the match-1-song app that answers JSON"
+  
+    @csrf_exempt 
+    def post(self, request, *args, **kwargs):
+        "Post = run 1-song match and display the results"
+        print('--- Match1JSON.POST ---')
+        di = urllib.parse.parse_qs(request.body)
+#        print(di)
+        match2 = False
+        try:
+            sndf = di[b'url'][0].decode('utf-8')
+            if b'reference' in di:
+                reff = di[b'reference'][0].decode('utf-8')
+                match2 = True
+        except Exception as inst:
+            print('POST arg unpacking error')
+
+        self.fileURL = sndf
+        pos = sndf.rfind('/')                # find tail of name
+        if pos < 0: pos = 0
+        pos2 = sndf.rfind('.')               # find name extension
+        if pos2 < 0: pos2 = len(sndf)
+        self.filename = sndf[(pos + 1) : pos2]
+        self.localFName = '/tmp/' + sndf[(pos + 1) : ]
+        self.fileExt = sndf[pos2 : ]
+
+        gConfig.had_error = False
+        if match2:
+            return self.match2(sndf, reff)
+        else:
+            return self.match1(sndf)
+
+    def match1(self, son1):
+        if len(son1):
+            # print('--- match1: ', son1, '---')
+            self.fileURL = son1
+            self.get_snd_file()         # Fetch snd file
+            if gConfig.had_error:
+                print('Uncaught file fetch error')
+                gConfig.error_msg = gConfig.get_err('file_fetch_err')
+#                self.send_nogo()
+                return
+                                        # run the match in octave
+            dct = self.runMatch1(self.localFName)  # returns match dict ---------------
+                                        # make the response list
+            js_text = '{  matches: ['
+            ks = list(dct.keys())
+            for ind in range(8):
+                mval = ks[ind]
+                mstr = dct[mval]            # 'annie_lennox+Medusa+09-Waiting_In_Vain.aiff'
+                toks = mstr.split('+')
+                js_text += '{ score: ' + mval + ' title: "' + toks[2] + '" artist: "' + toks[0] + '" file: "' + mstr + '" }, '
+            js_text += '] }'
+            print(js_text)
+            return HttpResponse(js_text, content_type="application-json")
+
+    def match2(son1, son2):
+        ""
+        
+    def runMatch1(self, fnam):
+        "Run the match after selecting the target song"
+        print('Matching', fnam)
+        sm = SongMatcher()
+        ret = sm.match1(fnam, True)
+        return ret
+
+    def get_snd_file(self):
+        "Fetch snd file"                     # using URL fetch
+        global gConfig
+        pos = self.fileURL.find('.s3.')      # is this an S3 URL?
+        if gConfig.use_s3_store and pos > 0: # fetch from S3 bucket
+            try:                             # the request gets the data
+                bucket, filename = self.get_bucket_and_key_from_url(self.fileURL)
+                print('S3: ', bucket, 'f', filename)
+                self.download_file_from_s3(bucket, filename)
+                fSiz = os.path.getsize(self.localFName)
+                log_msg('\tCopied ' + str(fSiz) + ' bytes from S3 to ' + self.localFName)
+                self.fSiz = fSiz
+                return
+            except Exception as inst:
+                log_msg('Fetch S3 snd file error 0')
+                log_msg(str(inst))
+                self.fSiz = 0
+                gConfig.had_error = True
+        elif self.fileURL.startswith('http://') or self.fileURL.startswith('https://'):
+            self.fSiz = 0
+            try:                             # the request gets the data
+                log_msg('Loading ' + self.fileURL + ' to ' + self.localFName + '...')
+                req = requests.get(self.fileURL, allow_redirects = True)
+                if req.status_code != 200:  # or not...
+                    log_msg('Error getting file; response:' + str(req.status_code))
+                    raise Exception('Error getting data file ' + self.fileURL)
+                ckSz = 128 * 1024           # read in 128 kB chunks
+                with open(self.localFName, 'wb') as outF:
+                    for chunk in req.iter_content(chunk_size = ckSz):    # read/write loop
+                        if chunk:
+                            outF.write(chunk)
+                outF.close()
+                fSiz = os.path.getsize(self.localFName)
+                log_msg('\tCopied ' + str(fSiz) + ' bytes to ' + self.localFName)
+                self.fSiz = fSiz
+            except Exception as inst:
+                log_msg('Fetch snd file error 1')
+                log_msg(str(inst))
+                self.fSiz = 0
+                gConfig.had_error = True
+        else:
+            log_msg('Using local file')
+
+
+    def download_file_from_s3(self, bucketname, filename):
+        "From JT; fetch a file from an S3 bucket"
+#        global gConfig
+        s3c = boto3.client('s3')
+        with open(self.localFName, 'wb') as f:
+            s3c.download_fileobj(bucketname, filename, f)
+
+
+class Match2JSON(generic.View):
+    "View for the match-2-songs app that answers JSON"
+    form_class = FileNameForm2
+    initial = {'key': 'value'}
+    template_name = 'songs/match2songs.html'
+
+    @csrf_exempt 
+    def post(self, request, *args, **kwargs):
+        "Post = run 1-song match and display the results"
+#        print('---', request.method, '---')
+        sndf1 = self.kwargs['url']
+        sndf2 = self.kwargs['reference']
+        if len(sndf1) and len(sndf2):
+                                        # run the match in octave
+            res = self.runMatch2(sndf1, sndf2)  # returns match message ---------------
+                                        # make the response list
+            msg = 'Matching Results: \r\n' + res + '\r\n'
+            return HttpResponse(msg)
+
+            # return HttpResponse(template.render(context, request))
+        return render(request, self.template_name)
+
+    def runMatch2(self, fnam1, fnam2):
+        "Run the match after selecting the 2 target songs"
+#        print('Matching', fnam1, 'and', fnam2)
+        sm = SongMatcher()
+        rtv = sm.match2(fnam1, fnam2)
+        return rtv
+
+def log_msg(msg):
+    print(msg)
 
