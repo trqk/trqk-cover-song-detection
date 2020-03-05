@@ -137,7 +137,7 @@ class SongMatcher(models.Model):
                     ind0 = cnt
                 cnt = cnt + 1
             lstr = str(res[ind0], 'utf-8').rstrip()
-            print('---', lstr, '---')
+#            print('---', lstr, '---')
             return lstr
         except Exception as inst:
             print('Error running octave for file \"' + son1_nam + '\"')

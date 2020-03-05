@@ -7,7 +7,7 @@
 # 	The copyright notice above does not evidence any actual or intended publication
 # 	of such source code.
 
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, QueryDict
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views import generic
@@ -153,22 +153,7 @@ class Match1View(generic.View):
 #        print('---', request.method, '---')
         form = FileNameForm()                   # display the file name form
         return render(request, 'songs/match1song.html', {'form': form})
-
-    # def get(self, request, *args, **kwargs):
-    #     form = self.form_class(initial=self.initial)
-    #     return render(request, self.template_name, {'form': form})
-
-    # def post(self, request, *args, **kwargs):
-    #     print('---', request.method, '---')
-    #     form = self.form_class(request.POST)
-    #     print('---', request.POST, '---')
-    #     print('---', form.form.cleaned_data, '---')
-    #     if form.is_valid():
-    #         # <process form cleaned data>
-    #         return HttpResponseRedirect('/success/')
-
-    #     return render(request, self.template_name, {'form': form})
-    
+   
     def post(self, request, *args, **kwargs):
         "Post = run 1-song match and display the results"
         form = FileNameForm(request.POST, request.FILES)
@@ -210,7 +195,7 @@ class Match1View(generic.View):
         "Run the match after selecting the target song"
         print('Matching', fnam)
         sm = SongMatcher()
-        ret = sm.match1(fnam)
+        ret = sm.match1(fnam, False)
         return ret
 
 
@@ -290,78 +275,124 @@ class Match1JSON(generic.View):
     @csrf_exempt 
     def post(self, request, *args, **kwargs):
         "Post = run 1-song match and display the results"
-        print('--- Match1JSON.POST ---')
-        di = urllib.parse.parse_qs(request.body)
+#        print('--- Match1JSON.POST ---')
+#        print(request.META['QUERY_STRING'])
+        di = QueryDict(request.META['QUERY_STRING'])
 #        print(di)
         match2 = False
+        reff = ''
         try:
-            sndf = di[b'url'][0].decode('utf-8')
-            if b'reference' in di:
-                reff = di[b'reference'][0].decode('utf-8')
+            sndf = di['url'] # [0] # .decode('utf-8')
+            if 'reference' in di:
+                reff = di['reference'] # [0] # .decode('utf-8')
+#                print('--- ref file fnd', reff,' ---')
                 match2 = True
         except Exception as inst:
-            print('POST arg unpacking error')
-
-        self.fileURL = sndf
-        pos = sndf.rfind('/')                # find tail of name
-        if pos < 0: pos = 0
-        pos2 = sndf.rfind('.')               # find name extension
-        if pos2 < 0: pos2 = len(sndf)
-        self.filename = sndf[(pos + 1) : pos2]
-        self.localFName = '/tmp/' + sndf[(pos + 1) : ]
-        self.fileExt = sndf[pos2 : ]
+            print('POST arg unpacking error', inst)
+#        print('--- snd files:', sndf, '---', reff, '---')
 
         gConfig.had_error = False
-        if match2:
-            return self.match2(sndf, reff)
-        else:
-            return self.match1(sndf)
+        self.fSiz = 0
+        if match2:                  # 2 files
+            self.fileURL = sndf
+            pos = sndf.rfind('/')                # find tail of name
+            if pos < 0: pos = 0
+            pos2 = sndf.rfind('.')               # find name extension
+            if pos2 < 0: pos2 = len(sndf)
+            self.filename = sndf[(pos + 1) : pos2]
+            self.localFName = '/tmp/' + sndf[(pos + 1) : ]
+            self.fileExt = sndf[pos2 : ]
+            
+            self.fileURL2 = reff
+            pos = reff.rfind('/')                # find tail of name
+            if pos < 0: pos = 0
+            pos2 = reff.rfind('.')               # find name extension
+            if pos2 < 0: pos2 = len(reff)
+            self.filename2 = reff[(pos + 1) : pos2]
+            self.localFName2 = '/tmp/' + reff[(pos + 1) : ]
+            self.fileExt2 = reff[pos2 : ]
 
-    def match1(self, son1):
-        if len(son1):
-            # print('--- match1: ', son1, '---')
-            self.fileURL = son1
-            self.get_snd_file()         # Fetch snd file
-            if gConfig.had_error:
+            return self.match2()
+        else:                       # single file
+            self.fileURL = sndf
+            pos = sndf.rfind('/')                # find tail of name
+            if pos < 0: pos = 0
+            pos2 = sndf.rfind('.')               # find name extension
+            if pos2 < 0: pos2 = len(sndf)
+            self.filename = sndf[(pos + 1) : pos2]
+            self.localFName = '/tmp/' + sndf[(pos + 1) : ]
+            self.fileExt = sndf[pos2 : ]
+            
+            return self.match1()
+
+    def match1(self):
+        "Perform match between a song and the default data set; answer JSON"
+        if len(self.fileURL):
+            print('--- match1:', self.fileURL, '---')
+            self.get_snd_file(self.fileURL, self.localFName)         # Fetch snd file
+            if gConfig.had_error or self.fSiz == 0:
                 print('Uncaught file fetch error')
                 gConfig.error_msg = gConfig.get_err('file_fetch_err')
 #                self.send_nogo()
                 return
-                                        # run the match in octave
-            dct = self.runMatch1(self.localFName)  # returns match dict ---------------
+            sm = SongMatcher()          # run the match in octave
+            dct = sm.match1(self.localFName, True)   # returns match dict ---------------
                                         # make the response list
-            js_text = '{  matches: ['
+            js_text = '{  "matches": ['
             ks = list(dct.keys())
-            for ind in range(8):
+            for ind in range(8):            # answer top 8 matches
                 mval = ks[ind]
                 mstr = dct[mval]            # 'annie_lennox+Medusa+09-Waiting_In_Vain.aiff'
                 toks = mstr.split('+')
-                js_text += '{ score: ' + mval + ' title: "' + toks[2] + '" artist: "' + toks[0] + '" file: "' + mstr + '" }, '
-            js_text += '] }'
+                if len(toks) != 3:          # other name formats (no '+')
+                    toks = ['', '', '']
+                js_text += '{ "score": ' + mval + ', "title": "' + toks[2] + '", "artist": "' + toks[0] + '", "url": "' + mstr + '" }, '
+            js_text = js_text[:-2]          # drop last comma
+            js_text += ' ] }'
             print(js_text)
             return HttpResponse(js_text, content_type="application-json")
 
-    def match2(son1, son2):
-        ""
-        
-    def runMatch1(self, fnam):
-        "Run the match after selecting the target song"
-        print('Matching', fnam)
-        sm = SongMatcher()
-        ret = sm.match1(fnam, True)
-        return ret
+    def match2(self):
+        "Perform match between 2 songs; answer JSON"
+        if len(self.fileURL):
+            print('--- match2: ', self.fileURL, '---', self.fileURL2, '---')
+            self.get_snd_file(self.fileURL, self.localFName)         # Fetch snd file
+            if gConfig.had_error or self.fSiz == 0:
+                print('Uncaught file fetch error')
+                gConfig.error_msg = gConfig.get_err('file_fetch_err')
+#                self.send_nogo()
+                return
+            self.get_snd_file(self.fileURL2, self.localFName2)         # Fetch snd file
+            if gConfig.had_error or self.fSiz == 0:
+                print('Uncaught file fetch error')
+                gConfig.error_msg = gConfig.get_err('file_fetch_err')
+#                self.send_nogo()
+                return
+            
+            sm = SongMatcher()          # run the match in octave
+            ret = sm.match2(self.localFName, self.localFName2)   # returns match string "WaitingInVain,  -- 08-Electricity,  = 8.83"
+                                        # make the response list
+            pos = ret.rfind(' ')                # find tail of name
+            if pos < 0: pos = -1
+            mat = ret[pos + 1:]
+            toks = self.fileURL.split('+')
+            if len(toks) != 3:          # other name formats (no '+')
+                toks = ['', '', '']
+            js_text = '{  "matches": [ { "score": ' + mat + ', "title": "' + toks[2] + '", "artist": "' + toks[0] + '", "url": "' + self.fileURL + '" } ] }'
+            print(js_text)
+            return HttpResponse(js_text, content_type="application-json")
 
-    def get_snd_file(self):
+    def get_snd_file(self, sndF, tmpF):
         "Fetch snd file"                     # using URL fetch
         global gConfig
-        pos = self.fileURL.find('.s3.')      # is this an S3 URL?
+        pos = sndF.find('.s3.')              # is this an S3 URL?
         if gConfig.use_s3_store and pos > 0: # fetch from S3 bucket
             try:                             # the request gets the data
-                bucket, filename = self.get_bucket_and_key_from_url(self.fileURL)
+                bucket, filename = self.get_bucket_and_key_from_url(sndF)
                 print('S3: ', bucket, 'f', filename)
                 self.download_file_from_s3(bucket, filename)
-                fSiz = os.path.getsize(self.localFName)
-                log_msg('\tCopied ' + str(fSiz) + ' bytes from S3 to ' + self.localFName)
+                fSiz = os.path.getsize(tmpF)
+                log_msg('\tCopied ' + str(fSiz) + ' bytes from S3 to ' + tmpF)
                 self.fSiz = fSiz
                 return
             except Exception as inst:
@@ -369,22 +400,22 @@ class Match1JSON(generic.View):
                 log_msg(str(inst))
                 self.fSiz = 0
                 gConfig.had_error = True
-        elif self.fileURL.startswith('http://') or self.fileURL.startswith('https://'):
+        elif sndF.startswith('http://') or sndF.startswith('https://'):
             self.fSiz = 0
             try:                             # the request gets the data
-                log_msg('Loading ' + self.fileURL + ' to ' + self.localFName + '...')
-                req = requests.get(self.fileURL, allow_redirects = True)
+                log_msg('Loading ' + sndF + ' to ' + tmpF + '...')
+                req = requests.get(sndF, allow_redirects = True)
                 if req.status_code != 200:  # or not...
                     log_msg('Error getting file; response:' + str(req.status_code))
-                    raise Exception('Error getting data file ' + self.fileURL)
+                    raise Exception('Error getting data file ' + sndF)
                 ckSz = 128 * 1024           # read in 128 kB chunks
-                with open(self.localFName, 'wb') as outF:
+                with open(tmpF, 'wb') as outF:
                     for chunk in req.iter_content(chunk_size = ckSz):    # read/write loop
                         if chunk:
                             outF.write(chunk)
                 outF.close()
-                fSiz = os.path.getsize(self.localFName)
-                log_msg('\tCopied ' + str(fSiz) + ' bytes to ' + self.localFName)
+                fSiz = os.path.getsize(tmpF)
+                log_msg('\tCopied ' + str(fSiz) + ' bytes to ' + tmpF)
                 self.fSiz = fSiz
             except Exception as inst:
                 log_msg('Fetch snd file error 1')
@@ -402,35 +433,14 @@ class Match1JSON(generic.View):
         with open(self.localFName, 'wb') as f:
             s3c.download_fileobj(bucketname, filename, f)
 
+    def get_bucket_and_key_from_url(self, url):
+        "From JT; parse a URL into a bucket and key"
+        parsed_url = urllib.parse(url)
+        bucket = parsed_url.netloc.split('.')[0]
+        key = parsed_url.path[1:]
+        key = key.replace('%3A', ":")
+        return (bucket, key)
 
-class Match2JSON(generic.View):
-    "View for the match-2-songs app that answers JSON"
-    form_class = FileNameForm2
-    initial = {'key': 'value'}
-    template_name = 'songs/match2songs.html'
-
-    @csrf_exempt 
-    def post(self, request, *args, **kwargs):
-        "Post = run 1-song match and display the results"
-#        print('---', request.method, '---')
-        sndf1 = self.kwargs['url']
-        sndf2 = self.kwargs['reference']
-        if len(sndf1) and len(sndf2):
-                                        # run the match in octave
-            res = self.runMatch2(sndf1, sndf2)  # returns match message ---------------
-                                        # make the response list
-            msg = 'Matching Results: \r\n' + res + '\r\n'
-            return HttpResponse(msg)
-
-            # return HttpResponse(template.render(context, request))
-        return render(request, self.template_name)
-
-    def runMatch2(self, fnam1, fnam2):
-        "Run the match after selecting the 2 target songs"
-#        print('Matching', fnam1, 'and', fnam2)
-        sm = SongMatcher()
-        rtv = sm.match2(fnam1, fnam2)
-        return rtv
 
 def log_msg(msg):
     print(msg)

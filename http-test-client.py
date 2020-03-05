@@ -22,7 +22,10 @@ Type command "exit" (or empty line) to exit program
 Reads HTTP command like,
 
 POST http://127.0.0.1:8000/songs/csd url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
-POST /songs/csd/ url:http://fastlabinc.com/SndsLike/WaitingInVain.wav
+
+POST /songs/csd/ url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
+
+POST /songs/csd/?url=http://fastlabinc.com/SndsLike/WaitingInVain.wav&reference=http://fastlabinc.com/SndsLike/08-Electricity.wav
 POST http://204.236.206.86:8000/csd url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
 
 POST http://204.236.206.86:8000/csd url=http://fastlabinc.com/SndsLike/WaitingInVain.wav  reference=http://fastlabinc.com/SndsLike/WaitingInVain.wav
@@ -75,26 +78,15 @@ def handle_response(conn, nam, tpo = '', ky = '', gen = ''):          # print se
     "handle_response"
     try:
         rsp = conn.getresponse()    # get response from server
-        print((rsp.status, rsp.reason))
+        print('----', (rsp.status, rsp.reason))
         data_received = rsp.read()
-#    print(data_received)
         dct = json.loads(data_received)
+        print('----', data_received)
         if nam.endswith('SYSTEM_TEST'):
             print(('Test results:', dct))
             return
-        err = get_str(dct, "statusOK")              # check return status
-        if not err:
-    #        print 'Error:', get_str(dct, "errorMessage"), nam, data_received
-            print(('%s,ERROR,,,,,%s' % (nam.encode('ISO-8859-1', 'ignore'), get_str(dct, "errorMessage"))))
-        else:
-            print(('%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s' % (get_str(dct, "name").replace(',', '_'), 
-                                              get_str(dct, "artist").replace(',', '_'), 
-                                              get_str(dct, "tempo"),  tpo,
-                                              get_str(dct, "key"), ky,
-                                              get_str(dct, "genre").replace(',', '_'), gen.replace(',', '_'),
-                                              get_str(dct, "mood2").replace(',', '_'),
-                                              get_str(dct, "instruments").replace(',', '_'),
-                                              get_str(dct, "style").replace(',', '_'))))
+        # err = get_str(dct, "statusOK")              # check return status
+        # print(('%s,ERROR,,,,,%s' % (nam.encode('ISO-8859-1', 'ignore'), get_str(dct, "errorMessage"))))
     except Exception as inst:
         print('Client handle_response error')
         print(inst)
@@ -107,14 +99,14 @@ def server_loop(conn):              # REPL
 #        print('Inp:', inp)
         if len(inp) > 0:
             cmd = inp.split()
-        else:
-            print('Empty input?')
-            break
+        # else:
+        #     print('Empty input?')
+        #     break
         if cmd is None: 
             break
-        if cmd[0] == 'exit':    # type exit or blank line to end
+        if cmd[0] == 'q':    # type 'q'' to end
             break
-        print('Cmd:', cmd)
+#        print('Cmd:', cmd)
         if len(cmd) == 2:       #request command to server
             # hdr = { cmd[1] }
             # conn.request(cmd[0], headers=hdr)
