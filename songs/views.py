@@ -349,7 +349,7 @@ class Match1JSON(generic.View):
                 js_text += '{ "score": ' + mval + ', "title": "' + toks[2] + '", "artist": "' + toks[0] + '", "url": "' + mstr + '" }, '
             js_text = js_text[:-2]          # drop last comma
             js_text += ' ] }'
-            print(js_text)
+#            print(js_text)
             return HttpResponse(js_text, content_type="application-json")
 
     def match2(self):
@@ -379,7 +379,7 @@ class Match1JSON(generic.View):
             if len(toks) != 3:          # other name formats (no '+')
                 toks = ['', '', '']
             js_text = '{  "matches": [ { "score": ' + mat + ', "title": "' + toks[2] + '", "artist": "' + toks[0] + '", "url": "' + self.fileURL + '" } ] }'
-            print(js_text)
+#            print(js_text)
             return HttpResponse(js_text, content_type="application-json")
 
     def get_snd_file(self, sndF, tmpF):

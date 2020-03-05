@@ -21,14 +21,9 @@ Type command "exit" (or empty line) to exit program
 
 Reads HTTP command like,
 
-POST http://127.0.0.1:8000/songs/csd url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
-
-POST /songs/csd/ url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
+POST /songs/csd/?url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
 
 POST /songs/csd/?url=http://fastlabinc.com/SndsLike/WaitingInVain.wav&reference=http://fastlabinc.com/SndsLike/08-Electricity.wav
-POST http://204.236.206.86:8000/csd url=http://fastlabinc.com/SndsLike/WaitingInVain.wav
-
-POST http://204.236.206.86:8000/csd url=http://fastlabinc.com/SndsLike/WaitingInVain.wav  reference=http://fastlabinc.com/SndsLike/WaitingInVain.wav
 
 As an alternative, you can use https://www.codepunker.com/tools/http-requests to create GET/POST requests
 
@@ -36,11 +31,9 @@ As an alternative, you can use https://www.codepunker.com/tools/http-requests to
 
 import http.client, sys, json
                                     # http server ip & port
-http_server = '127.0.0.1'           # test locally
+#http_server = '127.0.0.1'          # test locally
+http_server = '204.236.206.86'      # or test in the cloud
 server_port = 8000
-
-# http_server = '204.236.206.86'     # or test in the cloud
-# server_port = 80
 
 def read_file(conn, fn):                  # read a file of S3 file names
     print(('Load file list', fn))
@@ -92,24 +85,22 @@ def handle_response(conn, nam, tpo = '', ky = '', gen = ''):          # print se
         print(inst)
 
 
-def server_loop(conn):              # REPL
+def server_loop(conn):          # REPL
     "Read-eval-print loop"
     while 1:                    # the loop
         inp = input('HTTP command: ')
 #        print('Inp:', inp)
         if len(inp) > 0:
             cmd = inp.split()
-        # else:
+        # else:                 ###### repeat last command on empty line
         #     print('Empty input?')
         #     break
         if cmd is None: 
             break
-        if cmd[0] == 'q':    # type 'q'' to end
+        if cmd[0] == 'q':       # type 'q'' to end
             break
 #        print('Cmd:', cmd)
         if len(cmd) == 2:       #request command to server
-            # hdr = { cmd[1] }
-            # conn.request(cmd[0], headers=hdr)
             conn.request(cmd[0], cmd[1])
             handle_response(conn, cmd[1])
         else:
@@ -122,11 +113,14 @@ def server_loop(conn):              # REPL
 #### Main -------------------
 
 def main_fcn():
+                                # create the http connection to the server
     conn = http.client.HTTPConnection(http_server, server_port)
     if (len(sys.argv)) == 1:                    # if called with no arg, run REPL
         server_loop(conn)
     else:                                       # else load file list
         read_file(conn, sys.argv[1])
 
+# start main_fcn by default 
+        
 if __name__ == '__main__':
     main_fcn()
